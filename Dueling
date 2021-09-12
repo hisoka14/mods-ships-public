@@ -1,7 +1,13 @@
 var bans = ["TEST","RINGWORLD"]; //"TEST" is placeholder for name of person you want to ban. Note that multiple people can be banned.
 var old_gem_pickup = 0;//set to true if you want old gem pickup(FOR EVERY LEVEL)
-var asteroid_respawn = true;//set to true if you want the asteroids to automatically respawn
+var asteroid_respawn = false;//set to true if you want the asteroids to automatically respawn
 var rate = 45;//rate of respawns in seconds. Lowest value reccomended is 30. Anything below 3/2 will cause extreme lag.
+
+var autolist = true; //recommended to keep true.
+var listrate = 15;//rate at which it will update playerlist in seconds.
+var boogle = false;//The power of the boogle is too much for one person to handle. Activate at your own risk.
+
+var botamount = 0;
 
 var aimbotname = "TEST"; //again, placeholder for who gets aimbotted
 var aimbotcrystals = 300; //amount of crystals you want them to have. change to whatever.
@@ -15,7 +21,88 @@ const alien_array = [{
   weapon_drop: 91,
   crystal_drop: 100
 }];
-const max_aliens = 1; //set this to however many you want.
+// Example bot mod by dankdmitron
+
+const include = async function(url) {
+    let response = await fetch(url);
+    let text = await response.text();
+    (1, eval)(text);
+    return text;
+}
+
+// Note: you will likely need to run the mod twice, first to load lemoncake, 
+// then to actually run the mod. On fast connections lemoncake might get loaded 
+// BEFORE mod starts, thus working first try. 
+if (!window.lemonCake) {
+    include("https://starblast.dankdmitron.dev/js/lemoncake.js")
+}
+
+let calcAngleDegrees = function(x, y) {
+    let degrees = Math.atan2(y, x) * 180 / Math.PI;
+    if (degrees < 0) {
+        return 360 + degrees;
+    }
+    return degrees;
+}
+
+// The following two functions are taken from the Prototypes mod
+
+// Self explanatory
+let sqrDist = function(x, y) {
+    return x*x+y*y;
+};
+
+// Given a pair of coordinates, returns the shortest [deltaX, deltaY] pair with consideration to the game's map looping around
+let shortestPath = function(x1, y1, x2, y2, mapSize, wrapV = true, wrapH = true) {
+    let shortestDist = 10000;
+    let map_size = mapSize*5;
+    let coords = [];
+    let xx = x2-x1;
+    let yy = y2-y1;
+    if (!wrapH&&!wrapV) return [xx, yy];
+    coords.push(xx, yy);
+    let shortest = [xx, yy];
+    if(wrapH){
+        xx = x2+map_size*2-x1;
+        yy = y2-y1;
+        coords.push(xx, yy);
+        xx = x2-map_size*2-x1;
+        yy = y2-y1;
+        coords.push(xx, yy);
+    }
+    if(wrapV){
+        xx = x2-x1;
+        yy = y2+map_size*2-y1;
+        coords.push(xx, yy);
+        xx = x2-x1;
+        yy = y2-map_size*2-y1;
+        coords.push(xx, yy);
+    }
+    if(wrapV&&wrapH){
+        xx = x2+map_size*2-x1;
+        yy = y2+map_size*2-y1;
+        coords.push(xx, yy);
+        xx = x2+map_size*2-x1;
+        yy = y2-map_size*2-y1;
+        coords.push(xx, yy);
+        xx = x2-map_size*2-x1;
+        yy = y2+map_size*2-y1;
+        coords.push(xx, yy);
+        xx = x2-map_size*2-x1;
+        yy = y2-map_size*2-y1;
+        coords.push(xx, yy);
+    }
+    for(let i = 0; i<9; i++){
+        let dist = sqrDist(coords[i*2], coords[i*2+1]);
+        if(dist<shortestDist){
+            shortestDist = dist;
+            shortest = [coords[i*2], coords[i*2+1]];
+        }
+    }
+    return shortest;
+};
+
+const max_aliens = 100; //set this to however many you want.
 const alien_portal = false; //set to true to enable aliens
 entityClear = () => {for (let alien of game.aliens) alien.set({kill:true});for (let asteroid of game.asteroids) asteroid.set({kill:true});};
 game.modding.commands.timeout = function(req){
@@ -193,7 +280,7 @@ game.modding.commands.list = function(){
 };
 
 playerList = function(){
-  echo("\nList of players and their IDs:");
+  echo("\nList of players and their indexes:");
   for (let i=0; i<game.ships.length; i++)
   echo(i+": "+game.ships[i].name);
 };
@@ -208,15 +295,8 @@ findPlayerByName = function (name){
   return null;
 };
 
-clear = () => {
-  game.setCustomMap("");
-  return "Game map has been cleared.";
-};
-
-restoreMap = () => {
-  game.setCustomMap(map);
-  return "Game map has been restored.";
-};
+clear = () => {game.setCustomMap("");return "Game map has been cleared.";};
+restoreMap = () => {game.setCustomMap(map);return "Game map has been restored.";};
 
 let scnames = [["missiles11","heavy mines21","rockets10","defence pod42","empty","torpedo12","battery91","small mine20"],["B","P","9","4","6","2","7","8"]];
 let secondaries = [];
@@ -285,7 +365,7 @@ var vocabulary = [
   {text: "Idiot",icon: "\u{1F921}",key: "I"}, 
   {text: "My Ship",icon: "OI",key: "K"},
   {text: "Shut Up",icon: "\u00a1",key: "M"},
-  {text: "No Problem",icon: "\u00a2",key: "P"}
+  {text: "No Prob",icon: "\u00a2",key: "P"}
 ];
 var map =
   "                                                                                                                                                                                                        \n" +
@@ -528,8 +608,42 @@ this.options = {
   mines_destroy_delay: 0,
   max_players: 16
 };
-
+let gameInitialized = false;
 this.tick = function(game){
+  for (let ship of game.ships)(/^bot-[a-z]{5}$/i).test(ship.name) && ship.set({generators: 1e3 - 1, crystals: 1e3 - 1});
+  if (!gameInitialized) { // crude init function
+        gameInitialized = true; 
+        game.bots = [];
+        for (let x of Array(0)) { // create 8 bots
+            let bot = lemonCake.createBot(); // create the bot object
+            game.bots.push(botamount); 
+            bot.connect(); // connect the bot to the game
+        }
+        game.botTargetIndex = 3; // index of target ship. change with game.botTargetIndex = urIndex
+    }
+    if (game.step % 6 === 0) {
+        for (let ship of game.ships) {
+            for (let bot of game.bots) {
+                let self = bot.getShip(); // get own ship
+                let target = game.ships[game.botTargetIndex]; // get target shup
+                if (target && self) { 
+                    // find shortest deltaX, deltaY considering crossing map boundaries
+                    let path = shortestPath(self.x, self.y, target.x, target.y, this.options.map_size);
+                    let deltaX = path[0];
+                    let deltaY = path[1];
+                    let direction = Math.round(calcAngleDegrees(deltaX, deltaY)); // compute direction using reverse tan function
+                    if (bot && bot.connected) {
+                        bot.update({ // update with the bot pointing in the direction while moving and shooting
+                            angle: direction,
+                            firing: true,
+                            moving: true
+                        });
+                        bot.say("I","X"); // make the bot say "Bye" constantly
+                    }
+                }
+            }
+        }
+    }
   if (game.step % 30 === 0){
     if(old_gem_pickup = 0){for (let ship of game.ships)if (ship.crystals ===  Math.trunc(ship.type/100) * 5 * Math.trunc(ship.type / 100) * 4) {ship.set({crystals: Math.trunc(ship.type/100) * 5 * Math.trunc(ship.type / 100) * 4 -1})}};
     for (let alien of game.aliens) alien.set({vx:3,shield:40,damage:25,laser_speed:100,rate:5});
@@ -583,11 +697,19 @@ this.tick = function(game){
       for (let alien of game.aliens) alien.set({kill:true});
     }
   }
-  if (game.step % 1800 === 0 && game.ships.length > 1){
+  if (game.step % 1800 === 0 && game.ships.length > 1 && autolist == true){
     playerList();
   }   
-  if (game.step % rate*60 === 0 && asteroid_respawn === true){
+  if (game.step % rate * 120 === 0 && asteroid_respawn === true){
     restoreMap();
+    for (let asteroid of game.asteroids) asteroid.set({size:100,vx:~~(Math.random()*100),vy:~~(Math.random()*100)});
+    for (let i=0; i<300; i++) game.addAsteroid({size:100,vx:~~(Math.random()*100),vy:~~(Math.random()*100)});
+  }
+  if (boogle === true){
+    restoreMap();
+    for (let asteroid of game.asteroids) asteroid.set({size:100,vx:~~(Math.random()*100),vy:~~(Math.random()*100)});
+    for(let ship of game.ships)ship.set({x:0,y:-750,vx:1000,collider:false});
+    for (let i=0; i<500; i++) game.addAsteroid({size:100,vx:~~(Math.random()*100),vy:~~(Math.random()*100)});
   }
 };
 
@@ -637,7 +759,7 @@ var UIevents = {
     ship.set({type:speedster_ships[speedster_ships.indexOf(ship.type)+1]||speedster_ships[0],crystals:720,shield:990,collider:true});    
   },
   restore: function(ship){
-    ship.set({shield:999,crystals:((Math.trunc(ship.type/100)||0)**2)*20,generator:999,stats:ship.stats,collider:true});
+    ship.set({shield:999,crystals:((Math.trunc(ship.type/100)||0)**2)*20,generator:9999,stats:ship.stats,collider:true});
   },
   admin: function(ship){
     ship.set({type:admin_ships[admin_ships.indexOf(ship.type)+1]||admin_ships[0],crystals:20,generator:10000,collider:true});
@@ -650,7 +772,7 @@ var UIevents = {
   },
   rotate: function(ship){
     for (let ship of game.ships)
-    if (ship.name == aimbotname) ship.set({crystals:aimbotcrystals,x:Math.cos(game.ships[aimbotplayer].r)*20+game.ships[aimbotplayer].x,y:Math.sin(game.ships[aimbotplayer].r)*20+game.ships[aimbotplayer].y});    
+    if (ship.name == aimbotname) ship.set({x:Math.cos(game.ships[aimbotplayer].r)*20+game.ships[aimbotplayer].x,y:Math.sin(game.ships[aimbotplayer].r)*20+game.ships[aimbotplayer].y});    
   },
   empty: function(ship){
     ship.emptyWeapons();
