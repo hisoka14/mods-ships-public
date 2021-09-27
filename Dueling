@@ -1,13 +1,15 @@
 var bans = ["TEST","RINGWORLD"]; //"TEST" is placeholder for name of person you want to ban. Note that multiple people can be banned.
 var old_gem_pickup = 0;//set to true if you want old gem pickup(FOR EVERY LEVEL)
 var asteroid_respawn = false;//set to true if you want the asteroids to automatically respawn
-var rate = 45;//rate of respawns in seconds. Lowest value reccomended is 30. Anything below 3/2 will cause extreme lag.
-
-var autolist = true; //recommended to keep true.
+var rate = 45;//rate of map respawns in seconds. Lowest value reccomended is 30. Anything below 3/2 will cause extreme lag.
+var maxplayers = 16;//max amount of players
+var optionshortcut = "W"; //shortcutkey for the options button.
+var restoreshortcut = "J"; //shortcutkey for the restore/healing button.
+var buttontextcolor = "#cde"; //colour of the text in the button
+var buttonoutlinecolor = "#cde";//colour of the buttons outline
+var autolist = true; //automatically runs the playerList() command
 var listrate = 15;//rate at which it will update playerlist in seconds.
 var boogle = false;//The power of the boogle is too much for one person to handle. Activate at your own risk.
-
-var botamount = 0;
 
 var aimbotname = "TEST"; //again, placeholder for who gets aimbotted
 var aimbotcrystals = 300; //amount of crystals you want them to have. change to whatever.
@@ -21,87 +23,6 @@ const alien_array = [{
   weapon_drop: 91,
   crystal_drop: 100
 }];
-// Example bot mod by dankdmitron
-
-const include = async function(url) {
-    let response = await fetch(url);
-    let text = await response.text();
-    (1, eval)(text);
-    return text;
-}
-
-// Note: you will likely need to run the mod twice, first to load lemoncake, 
-// then to actually run the mod. On fast connections lemoncake might get loaded 
-// BEFORE mod starts, thus working first try. 
-if (!window.lemonCake) {
-    include("https://starblast.dankdmitron.dev/js/lemoncake.js")
-}
-
-let calcAngleDegrees = function(x, y) {
-    let degrees = Math.atan2(y, x) * 180 / Math.PI;
-    if (degrees < 0) {
-        return 360 + degrees;
-    }
-    return degrees;
-}
-
-// The following two functions are taken from the Prototypes mod
-
-// Self explanatory
-let sqrDist = function(x, y) {
-    return x*x+y*y;
-};
-
-// Given a pair of coordinates, returns the shortest [deltaX, deltaY] pair with consideration to the game's map looping around
-let shortestPath = function(x1, y1, x2, y2, mapSize, wrapV = true, wrapH = true) {
-    let shortestDist = 10000;
-    let map_size = mapSize*5;
-    let coords = [];
-    let xx = x2-x1;
-    let yy = y2-y1;
-    if (!wrapH&&!wrapV) return [xx, yy];
-    coords.push(xx, yy);
-    let shortest = [xx, yy];
-    if(wrapH){
-        xx = x2+map_size*2-x1;
-        yy = y2-y1;
-        coords.push(xx, yy);
-        xx = x2-map_size*2-x1;
-        yy = y2-y1;
-        coords.push(xx, yy);
-    }
-    if(wrapV){
-        xx = x2-x1;
-        yy = y2+map_size*2-y1;
-        coords.push(xx, yy);
-        xx = x2-x1;
-        yy = y2-map_size*2-y1;
-        coords.push(xx, yy);
-    }
-    if(wrapV&&wrapH){
-        xx = x2+map_size*2-x1;
-        yy = y2+map_size*2-y1;
-        coords.push(xx, yy);
-        xx = x2+map_size*2-x1;
-        yy = y2-map_size*2-y1;
-        coords.push(xx, yy);
-        xx = x2-map_size*2-x1;
-        yy = y2+map_size*2-y1;
-        coords.push(xx, yy);
-        xx = x2-map_size*2-x1;
-        yy = y2-map_size*2-y1;
-        coords.push(xx, yy);
-    }
-    for(let i = 0; i<9; i++){
-        let dist = sqrDist(coords[i*2], coords[i*2+1]);
-        if(dist<shortestDist){
-            shortestDist = dist;
-            shortest = [coords[i*2], coords[i*2+1]];
-        }
-    }
-    return shortest;
-};
-
 const max_aliens = 100; //set this to however many you want.
 const alien_portal = false; //set to true to enable aliens
 entityClear = () => {for (let alien of game.aliens) alien.set({kill:true});for (let asteroid of game.asteroids) asteroid.set({kill:true});};
@@ -297,7 +218,6 @@ findPlayerByName = function (name){
 
 clear = () => {game.setCustomMap("");return "Game map has been cleared.";};
 restoreMap = () => {game.setCustomMap(map);return "Game map has been restored.";};
-
 let scnames = [["missiles11","heavy mines21","rockets10","defence pod42","empty","torpedo12","battery91","small mine20"],["B","P","9","4","6","2","7","8"]];
 let secondaries = [];
 for (let i=0; i<scnames[0].length; i++)
@@ -606,44 +526,9 @@ this.options = {
   soundtrack: "argon.mp3",
   mines_self_destroy: true,
   mines_destroy_delay: 0,
-  max_players: 16
+  max_players: maxplayers
 };
-let gameInitialized = false;
 this.tick = function(game){
-  for (let ship of game.ships)(/^bot-[a-z]{5}$/i).test(ship.name) && ship.set({generators: 1e3 - 1, crystals: 1e3 - 1});
-  if (!gameInitialized) { // crude init function
-        gameInitialized = true; 
-        game.bots = [];
-        for (let x of Array(0)) { // create 8 bots
-            let bot = lemonCake.createBot(); // create the bot object
-            game.bots.push(botamount); 
-            bot.connect(); // connect the bot to the game
-        }
-        game.botTargetIndex = 3; // index of target ship. change with game.botTargetIndex = urIndex
-    }
-    if (game.step % 6 === 0) {
-        for (let ship of game.ships) {
-            for (let bot of game.bots) {
-                let self = bot.getShip(); // get own ship
-                let target = game.ships[game.botTargetIndex]; // get target shup
-                if (target && self) { 
-                    // find shortest deltaX, deltaY considering crossing map boundaries
-                    let path = shortestPath(self.x, self.y, target.x, target.y, this.options.map_size);
-                    let deltaX = path[0];
-                    let deltaY = path[1];
-                    let direction = Math.round(calcAngleDegrees(deltaX, deltaY)); // compute direction using reverse tan function
-                    if (bot && bot.connected) {
-                        bot.update({ // update with the bot pointing in the direction while moving and shooting
-                            angle: direction,
-                            firing: true,
-                            moving: true
-                        });
-                        bot.say("I","X"); // make the bot say "Bye" constantly
-                    }
-                }
-            }
-        }
-    }
   if (game.step % 30 === 0){
     if(old_gem_pickup = 0){for (let ship of game.ships)if (ship.crystals ===  Math.trunc(ship.type/100) * 5 * Math.trunc(ship.type / 100) * 4) {ship.set({crystals: Math.trunc(ship.type/100) * 5 * Math.trunc(ship.type / 100) * 4 -1})}};
     for (let alien of game.aliens) alien.set({vx:3,shield:40,damage:25,laser_speed:100,rate:5});
@@ -665,8 +550,8 @@ this.tick = function(game){
           visible: true,
           shortcut: "W",
           components: [
-            {type:"box",position:[0,0,100,100],fill:"rgba(68, 85, 102, 0)",stroke:"#cde",width:5},
-            {type: "text",position:[0,30,100,60],value:"Options [W]",color:"#cde"},
+            {type:"box",position:[0,0,100,100],fill:"rgba(68, 85, 102, 0)",stroke:buttontextcolor,width:5},
+            {type: "text",position:[0,30,100,60],value:"Options["+optionshortcut+"]",color:buttontextcolor},
           ]
         });   
         ship.custom.option_screen = true;    
@@ -677,8 +562,8 @@ this.tick = function(game){
           visible: true,
           shortcut: "J",
           components: [
-            {type:"box",position:[0,0,190,100],fill:"rgba(68, 85, 102, 0)",stroke:"#cde",width:5},
-            {type: "text",position:[0,30,100,60],value:"Restore [J]",color:"#cde"},
+            {type:"box",position:[0,0,190,100],fill:"rgba(68, 85, 102, 0)",stroke:buttonoutlinecolor,width:5},
+            {type: "text",position:[0,30,100,60],value:"Restore["+ restoreshortcut+"]",color:buttontextcolor},
           ]
         });       
         ship.custom.tree = 0;
