@@ -1,3 +1,4 @@
+//Credit to 45rfew/Money as well as ___ and Bhpsngum
 var bans = ["TEST","RINGWORLD"]; //"TEST" is placeholder for name of person you want to ban. Note that multiple people can be banned.
 var old_gem_pickup = 0;//set to true if you want old gem pickup(FOR EVERY LEVEL)
 var asteroid_respawn = false;//set to true if you want the asteroids to automatically respawn
