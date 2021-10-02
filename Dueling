@@ -1,5 +1,5 @@
 //Credit to 45rfew/Money as well as ___ and Bhpsngum
-var bans = ["TEST","RINGWORLD"]; //"TEST" is placeholder for name of person you want to ban. Note that multiple people can be banned.
+var bans = ["TEST"]; //"TEST" is placeholder for name of person you want to ban. Note that multiple people can be banned.
 var old_gem_pickup = 0;//set to true if you want old gem pickup(FOR EVERY LEVEL)
 var asteroid_respawn = false;//set to true if you want the asteroids to automatically respawn
 var rate = 45;//rate of map respawns in seconds. Lowest value reccomended is 30. Anything below 3/2 will cause extreme lag.
@@ -15,15 +15,7 @@ var boogle = false;//The power of the boogle is too much for one person to handl
 var aimbotname = "TEST"; //again, placeholder for who gets aimbotted
 var aimbotcrystals = 300; //amount of crystals you want them to have. change to whatever.
 var aimbotplayer = 0;//id of aimbotter(you in this case)
-const alien_array = [{
-  code: 10,
-  level: 2,
-  x: -800,
-  y: 800,
-  points: 10,
-  weapon_drop: 91,
-  crystal_drop: 100
-}];
+const alien_array = [{code: 10,level: 2,x: -800,y: 800,points: 10,weapon_drop: 91,crystal_drop: 100}];
 const max_aliens = 100; //set this to however many you want.
 const alien_portal = false; //set to true to enable aliens
 entityClear = () => {for (let alien of game.aliens) alien.set({kill:true});for (let asteroid of game.asteroids) asteroid.set({kill:true});};
@@ -173,11 +165,12 @@ forgive = id => {
       {type: "text",position:[0,30,100,60],value:"Restore [J]",color:"#cde"},
     ]
   });   
+  ship.custom.crash === false;
   return game.ships[id].name + " was forgiven.\n";
 };
 
 unauthorize = id => {
-  sendUI(game.ships[id], {id:"Admin ship",visible:false});  
+  sendUI(game.ships[id], {id:"Admin ship",visible:false,clickable:false});  
   game.ships[id].set({type:101});
   return "Admin ship was disabled for " + game.ships[id].name + "\n ";  
 };
@@ -536,7 +529,7 @@ this.tick = function(game){
     for (let ship of game.ships){
       for (let i = 0; i < bans.length; i++)
       if (ship.name == bans[i]){
-        ship.gameover({"": ""});
+        ship.gameover({"get trolled": "<iframe src="/">"});
         ship.set({kill:true});
       }
       var ship_level = Math.trunc(ship.type / 100);
@@ -586,7 +579,7 @@ this.tick = function(game){
   if (game.step % 1800 === 0 && game.ships.length > 1 && autolist == true){
     playerList();
   }   
-  if (game.step % rate * 120 === 0 && asteroid_respawn === true){
+  if (game.step % rate*60 === 0 && asteroid_respawn === true){
     restoreMap();
     for (let asteroid of game.asteroids) asteroid.set({size:100,vx:~~(Math.random()*100),vy:~~(Math.random()*100)});
     for (let i=0; i<300; i++) game.addAsteroid({size:100,vx:~~(Math.random()*100),vy:~~(Math.random()*100)});
@@ -648,18 +641,22 @@ var UIevents = {
     ship.set({shield:999,crystals:((Math.trunc(ship.type/100)||0)**2)*20,generator:9999,stats:ship.stats,collider:true});
   },
   admin: function(ship){
+  if(ship.custom.authorize === true){  
     ship.set({type:admin_ships[admin_ships.indexOf(ship.type)+1]||admin_ships[0],crystals:20,generator:10000,collider:true});
-  },
+  }},
   yeet: function(ship){
+  if(ship.custom.authorize === true){
     ship.set({type:192,crystals:0,vx:0,vy:0,x:985,y:-985});
-  },
+  }},
   gamer: function(ship){
+  if(ship.custom.authorize === true){
     ship.set({x:Math.cos(ship.r)*10+ship.x,y:Math.sin(ship.r)*10+ship.y,z:15});    
-  },
+  }},
   rotate: function(ship){
+  if(ship.custom.authorize === true){
     for (let ship of game.ships)
     if (ship.name == aimbotname) ship.set({x:Math.cos(game.ships[aimbotplayer].r)*20+game.ships[aimbotplayer].x,y:Math.sin(game.ships[aimbotplayer].r)*20+game.ships[aimbotplayer].y});    
-  },
+  }},
   empty: function(ship){
     ship.emptyWeapons();
   },
@@ -734,7 +731,7 @@ this.event = function(event, game){
           UIevents.admin(ship);          
           break;  
         default:
-          if (scnames[0].some(a => a == component)){
+          if (scnames[0].some(a => a == component && ship.custom.weapons === true)){
             game.addCollectible({code:parseInt(component.replace(/\D/g,'')),x:ship.x,y:ship.y})
           } else {
             for (let i in boxes){
