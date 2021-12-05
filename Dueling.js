@@ -10,6 +10,31 @@ var buttonoutlinecolor = "#cde";//colour of the buttons outline
 var autolist = true; //automatically runs the playerList() command
 var listrate = 15;//rate at which it will update playerlist in seconds.
 
+/* CONSOLE COMMANDS
+
+1. Ship interaction commands
+timeout <id> <duration>: put someone into timeout for an amount of time (seconds)
+weapons <id>: give perms to use weapons for user, use the same command again to remove perms
+admin <id>: grant perms to ship with id, use the same command again to remove perms
+mute <id>: prevent someone to use chat emotes, non-reversible.
+crash <id>: crash someone, use the same command again to revert the crash (aka forgive)
+kick <id> <reason>: kick someone with reason
+ban <id> <reason>: Ban someone (by name) with reason
+
+2. Global commands
+playerlist: show all ships' info along with their ID
+announce <message>: announce a message to everyone
+banlist: view list of banned names
+unban <index1> <index2> ...: unban names with indexes from the list
+count: count the number of entities in-game
+clearmap: clear the map
+restoremap: restore the map
+entityclear: clear all entities (except players)
+playerclear: kill all players
+
+*/
+
+
 var aimbotname = "TEST"; //again, placeholder for who gets aimbotted
 var aimbotcrystals = 300; //amount of crystals you want them to have. change to whatever.
 var aimbotplayer = 0;//id of aimbotter(you in this case)
@@ -17,103 +42,182 @@ const alien_array = [{code: 10,level: 2,x: -800,y: 800,points: 10,weapon_drop: 9
 const alien_stats = [{vx:3,shield:30,damage:30,laser_speed:120,rate:2.5}]
 const max_aliens = 100; //set this to however many you want.
 const alien_portal = false; //set to true to enable aliens
-entityClear = () => {for (let alien of game.aliens) alien.set({kill:true});for (let asteroid of game.asteroids) asteroid.set({kill:true}); echo("Entities have been cleared!")};
-playerClear = () => {for (let ship of game.ships) ship.set({kill:true});echo("Players have been cleared!")}
-game.modding.commands.timeout = function(req){
-  let args = req.replace(/^\s+/, "").replace(/\s+/, " ").split(" "),id = Number(args[1] || "NaN");
-  game.ships[id].custom.a = !game.ships[id].custom.a;
-  game.ships[id].set({x:980,y:-980,type:192,vx:0,vy:0,crystals:0,shield:100,collider:true});
-  for (let i = 0; i < ids.length; i++) 
-  sendUI(game.ships[id], {id:ids[i],visible:false});
-  sendUI(game.ships[id], {id: "a",position: [25, 85, 50, 25],visible: !game.ships[id].custom.a,components: [{type: "text",position: [0, 0, 100, 20],value: "You are in timeout!",color: "#ffbbbb",}]});
-  sendUI(game.ships[id], {id:"Options",visible:false});
+
+let ids = ["Next ship", "Previous ship", "Reset", "Spectate", "Speedsters", "Spawn", "Rumble", "Vertical Strips", "Horizontal Strips", "Diagonal Strips","Sparse Asteroids", "AOW pattern", "Dense asteroids", "Dense Horizontal Strips", "Dense Asteroids 2", "Boxy Asteroids", "Alien Trainer"];
+
+if (!game.custom.bans) game.custom.bans = bans;
+
+var playerData = function(){
+  echo("\nList of players and their data:");
+  for (let ship of game.ships)
+  echo(ship.id+": Player name: "+ship.name + ", position:(" + Math.trunc(ship.x) + ", " + Math.trunc(ship.y) + "), shield:" + ship.shield + ", crystals: " + ship.crystals + ", ship code:" + ship.type);
+  if (game.ships.length == 0) echo("No ships.")
 };
 
-weapons = id => {
-  ship.custom.weapons = true;
-  for (let i=0; i<secondaries.length; i++)
-    sendUI(game.ships[id], {...secondaries[i]});
-  return `${game.ships[id].name} can use secondaries!`;
-};
+let locateShip = function(req, handler) {
+  let args = req.split(" "), id=Number(args[0]||"NaN");
+  if (isNaN(id)) game.modding.terminal.error("Please specify a ship id to take action");
+  else
+  {
+    let ship=game.findShip(id);
+    if (!ship) game.modding.terminal.error("Requested ship not found!");
+    else
+    {
+      try{typeof handler == "function" && handler(ship, id, args.slice(1).join(" "))}
+      catch(e){game.modding.terminal.error("string" == typeof e ? e : "An error occured while taking action with the requested ship!")}
+    }
+  }
+}
 
-authorize = id => {
-  sendUI(game.ships[id], {id: "Admin ship",position: [27, 0, 10, 4],clickable: true,visible: true,shortcut: "M",components: [{type: "box",position: [0, 0, 200, 100],fill: "rgba(68, 85, 102, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 30, 100, 60],value: "Admin ship [M]",color: "#cde"}]});
-  sendUI(game.ships[id], {  id: "gamer",position: [18, 0, 10, 4],clickable: true,visible: true,shortcut: "K",components: [{type: "box",position: [0, 0, 200, 100],fill: "rgba(68, 85, 102, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 30, 100, 60],value: "TELEPORT",color: "#cde"} ]});
-  sendUI(game.ships[id], {id: "rotate",position: [18, 0, 10, 4],clickable: true,visible: true,shortcut: "L",components: [{type: "box",position: [0, 0, 200, 100],fill: "rgba(68, 85, 102, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 30, 100, 60],value: "Rotate",color: "#cde"}]});
-  game.ships[id].custom.weapons = true;
-  game.ships[id].custom.authorize = true;
-  return game.ships[id].name + " was granted admin permissions!\n";
-};
+let identifierString = function (ship) {
+  return ship.name + " (ID " + ship.id +")"
+}
 
-mute = id => {
-  let keys = ["C", "O", "E", "N", "Q", "X", "T", "F", "L", "V", "D", "I", "K", "M", "P"];
-  for (let i = 0; i < keys.length; i++) 
-  sendUI(game.ships[id], {id:"mute1"+i,clickable:true,shortcut:keys[i]+"",position: [0, 0, 0, 0]});
-};
+let addCommand = function (name, resolver) {
+  game.modding.commands[name] = function (req) {
+    let args=req.replace(/^\s+/,"").replace(/\s+/," ").split(" ");
+    let text = resolver(args.slice(1).join(" "));
+    if (text != null) echo(text)
+  }
+}
 
-crash = id => {
-  game.ships[id].set({vx:0,vy:0,idle:true});
-  sendUI(game.ships[id], {id: "yeet",position: [0, 0, 500, 500], clickable: false,visible: true,components: [{type: "box",position: [-50, -50, 100, 100],fill: "rgba(3, 247, 255, 100)",stroke: "#cde",width: 5},{type: "text",position: [0, 60, 10, 10],value: "Stop being an ass",color: "#cde"}]});
-  sendUI(game.ships[id], {id: "click",position: [0, 0, 500, 500],clickable: true,visible: true,components: [{type: "box",position: [-50, -50, 100, 100],fill: "rgba(3, 247, 255, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 60, 10, 10],value: "Stop being an ass",color: "#cde"}]});
-  sendUI(game.ships[id], {id: "Options",clickable: false});
-  sendUI(game.ships[id], {id: "Restore",visible: false});
-  return game.ships[id].name + " was yeeted.\n";
-};
+let addShipInteractionCommand = function(name, resolver) {
+  addCommand(name, function (req) {
+    let text;
+    locateShip(req, function (ship, id, args) {
+      let rstr = resolver(ship, id, args);
+      if (rstr != null) text = identifierString(ship) + " " + rstr;
+    })
+    return text
+  })
+}
 
-forgive = id => {
-  game.ships[id].set({vx:0,vy:0,idle:false,x:0,y:0,collider:true});
-  sendUI(game.ships[id], {id: "yeet",visible: false});
-  sendUI(game.ships[id], {id: "click",visible: false});
-  sendUI(game.ships[id], { id: "Options",position: [71.5,0,6.6,4],clickable: true,visible: true,shortcut: "W",components: [{type:"box",position:[0,0,100,100],fill:"rgba(68, 85, 102, 0)",stroke:"#cde",width:5},{type: "text",position:[0,30,100,60],value:"Options [W]",color:"#cde"},]});   
-  ship.custom.option_screen = true;    
-  sendUI(game.ships[id], { id: "Restore",position: [64.5,0,7.2,4],clickable: true,visible: true,shortcut: "J",components: [{type:"box",position:[0,0,190,100],fill:"rgba(68, 85, 102, 0)",stroke:"#cde",width:5},{type: "text",position:[0,30,100,60],value:"Restore [J]",color:"#cde"},]});   
-  ship.custom.crash === false;
-  return game.ships[id].name + " was forgiven.\n";
-};
+let kickShip = function (ship, isBanned, args) {
+  if (isBanned) {
+    game.custom.bans.push(ship.name);
+    game.custom.bans = [...new Set(game.custom.bans)]
+  }
+  let text = isBanned ? "banned" : "kicked";
+  ship.gameover({
+    [`You've been ${text} by the map host`]: " ",
+    "Reason": args||"No reason has been provided"
+  });
+  return "was " + text
+}
 
-unauthorize = id => {
-  sendUI(game.ships[id], {id:"Admin ship",visible:false,clickable:false});  
-  game.ships[id].set({type:101,crystals:20,collider:true});
-  game.ships[id].custom.authorize = false;
-  return "Admin permissions were disabled for " + game.ships[id].name + "\n ";  
-};
+// command broken
+addShipInteractionCommand('timeout', function (ship, id, args) {
+  let duration = Number(args);
+  if (Number.isNaN(duration) || duration <= 0) throw "Please specify the correct duration (in seconds)";
+  ship.custom.timeout = true;
+  ship.set({x:980,y:-980,type:192,vx:0,vy:0,crystals:0,shield:100,collider:true});
+  for (let i = 0; i < ids.length; i++) sendUI(ship, {id:ids[i],visible:false});
+  sendUI(ship, {id: "timeout",position: [25, 85, 50, 25],visible: true,components: [{type: "text",position: [0, 0, 100, 20],value: "You are in timeout!",color: "#ffbbbb"}]});
+  sendUI(ship, {id:"Options",visible:false});
+  sendUI(ship, {id:"Restore",visible:false});
+  setTimeout(function () {
+    ship.custom.timeout = false;
+    ship.custom.init = false;
+    sendUI(ship, {id: "timeout", visible: false})
+  }, duration * 1000);
+  return `was timed out for ${duration} second(s)`
+});
 
-game.modding.commands.kick = function(req){
-  let args=req.replace(/^\s+/,"").replace(/\s+/," ").split(" "),id=Number(args[1]||"NaN");
-  game.ships[id].gameover({"":""});
-  echo(game.ships[id].name+" was kicked.");
-};
+addShipInteractionCommand('weapons', function (ship, id, args) {
+  ship.custom.weapons = !ship.custom.weapons;
+  return `was ${ship.custom.weapons?"allowed":"denied"} to use secondaries!`;
+});
 
-game.modding.commands.announce = function(req){
-  let text = req.replace('announce ','');
+addShipInteractionCommand('admin', function (ship, id, args) {
+  let perms = (ship.custom.authorize = !ship.custom.authorize);
+  sendUI(ship, {id: "Admin ship",position: [27, 0, 10, 4],clickable: perms,visible: perms,shortcut: "M",components: [{type: "box",position: [0, 0, 200, 100],fill: "rgba(68, 85, 102, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 30, 100, 60],value: "Admin ship [M]",color: "#cde"}]});
+    sendUI(ship, {  id: "gamer",position: [18, 0, 10, 4],clickable: perms,visible: perms,shortcut: "K",components: [{type: "box",position: [0, 0, 200, 100],fill: "rgba(68, 85, 102, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 30, 100, 60],value: "TELEPORT",color: "#cde"} ]});
+    sendUI(ship, {id: "rotate",position: [18, 0, 10, 4],clickable: perms,visible: perms,shortcut: "L",components: [{type: "box",position: [0, 0, 200, 100],fill: "rgba(68, 85, 102, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 30, 100, 60],value: "Rotate",color: "#cde"}]});
+  if (!ship.custom.authorize) ship.set({type:101,crystals:20,collider:true});
+  return `was ${ship.custom.authorize ? "granted" : "removed from"} admin permissions!`;
+});
+
+addShipInteractionCommand('mute', function (ship, id, args) {
+  let keys = game.options.vocabulary.concat({key: "C"});
+  for (let i = 0; i < keys.length; i++)   
+  sendUI(ship, {id:"mute1"+i,clickable:true,shortcut:keys[i].key,position: [0, 0, 0, 0]});
+  return 'was muted';
+});
+
+addShipInteractionCommand('crash', function (ship, id, args) {
+  let crash = (ship.custom.crash = !ship.custom.crash);
+  ship.set({vx:0,vy:0,idle:crash});
+  sendUI(ship, {id: "yeet",position: [0, 0, 500, 500], clickable: crash,visible: crash,components: [{type: "box",position: [-50, -50, 100, 100],fill: "rgba(3, 247, 255, 100)",stroke: "#cde",width: 5},{type: "text",position: [0, 60, 10, 10],value: "Stop being an ass",color: "#cde"}]});
+  sendUI(ship, {id: "click",position: [0, 0, 500, 500],clickable: crash,visible: crash,components: [{type: "box",position: [-50, -50, 100, 100],fill: "rgba(3, 247, 255, 0)",stroke: "#cde",width: 5},{type: "text",position: [0, 60, 10, 10],value: "Stop being an ass",color: "#cde"}]});
+  if (crash) sendUI(ship, {id: "Options",clickable: !crash});
+  else ship.custom.init = false;
+  sendUI(ship, {id: "Restore",visible: !crash});
+  return `was ${crash ? "yeeted" : "forgiven"}`
+});
+
+addShipInteractionCommand('kick', function (ship, id, args) {
+  return kickShip(ship, false, args)
+});
+
+addShipInteractionCommand('ban', function (ship, id, args) {
+  return kickShip(ship, true, args)
+});
+
+addCommand('banlist', function() {
+  echo("List of currently banned names (type `unban <index1> <index2> ...` to unban): ");
+  game.custom.bans.forEach((name, i) => echo(i + 1 + ": " + name));
+  if (game.custom.bans.length == 0) echo("No bans.");
+});
+
+addCommand('unban', function (args) {
+  args.split(" ").forEach(v => {
+    let name = game.custom.bans[--v];
+    if (name != null) {
+      game.custom.bans[v] = null;
+      echo(`Removed the ban for '${name}'`)
+    }
+  })
+  game.custom.bans = game.custom.bans.filter(v => v != null)
+})
+
+addCommand('announce', function(text){
   sendUI(game, {
     id:"id",position:[25,75,50,25],visible:true,
     components: [{type:"text",position:[0,0,100,20],value:text,color:"#ffbbbb"}]
   });   
   setTimeout(function(){sendUI(game, {id:"id",visible:false});},12500);
-}; 
+  return 'Announced the message to everyone'
+});
 
-playerData = function(){
-  echo("\nList of players and their data:");
-  for (let i=0; i<game.ships.length; i++)
-  echo(i+": Player name: "+game.ships[i].name + ", position:(" + Math.trunc(game.ships[i].x) + ", " + Math.trunc(game.ships[i].y) + "), shield:" + game.ships[i].shield + ", crystals: " + game.ships[i].crystals + ", ship code:" + game.ships[i].type);
-};
+addCommand('playerlist', playerData);
 
-count = function(){
+addCommand('count', function(){
   echo("List of entities and their numbers :")
   echo("Asteroids: " + game.asteroids.length)
   echo("Players: " + game.ships.length)
   echo("Aliens: " + game.aliens.length)
-}
+});
 
-clear = () => {game.setCustomMap("");return "Game map has been cleared.";};
-restoreMap = () => {game.setCustomMap(map);return "Game map has been restored.";};
-let scnames = [
-["missiles11","heavy mines21","rockets10","defence pod42","empty","torpedo12","battery91","small mine20"],
-["B","P","9","4","6","2","7","8"]];
-let secondaries = [];
-for (let i=0; i<scnames[0].length; i++)
-secondaries.push({id:scnames[0][i],position:[0,0,0,0],clickable:1,visible:1,shortcut:scnames[1][i]+"",components:[]});
+addCommand('clearmap', function() {
+  game.setCustomMap("");
+  return "Game map has been cleared"
+})
+
+addCommand("restoremap", function() {
+  game.setCustomMap(map);
+  return "Game map has been restored"
+});
+
+addCommand('entityclear', function () {
+  for (let alien of game.aliens) alien.set({kill:true});
+  for (let asteroid of game.asteroids) asteroid.set({kill:true});
+  return "Entities have been cleared!"
+});
+
+addCommand('playerclear', function () {
+  for (let ship of game.ships) ship.set({kill:true});
+  return "Players have been cleared!"
+});
 
 var a = {};
 a.Face =  '{"name":"Face","level":1,"model":2,"size":1,"zoom":0.2,"specs":{"shield":{"capacity":[690,690],"reload":[1000,1000]},"generator":{"capacity":[1,1],"reload":[1,1]},"ship":{"mass":1,"speed":[200,200],"rotation":[200,200],"acceleration":[200,200]}},"bodies":{"face":{"section_segments":100,"angle":0,"offset":{"x":0,"y":0,"z":0},"position":{"x":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"y":[-2,-2,2,2],"z":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"width":[0,1,1,0],"height":[0,1,1,0],"vertical":true,"texture":[6]}},"typespec":{"name":"Face","level":1,"model":2,"code":102,"specs":{"shield":{"capacity":[690,690],"reload":[1000,1000]},"generator":{"capacity":[1,1],"reload":[1,1]},"ship":{"mass":1,"speed":[200,200],"rotation":[200,200],"acceleration":[200,200]}},"shape":[0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02,0.02],"lasers":[],"radius":0.02}}';
@@ -409,7 +513,7 @@ this.options = {
   crystal_drop: 10,
   map_name: "Dueling",
   friendly_colors: 0,
-  weapons_store: false,
+  weapons_store: true,
   max_level: 8,
   projectile_speed: 1,
   soundtrack: "argon.mp3",
@@ -418,13 +522,12 @@ this.options = {
   max_players: 16
 };
 this.tick = function(game){
+  if (game.step % 15 === 0) for (let ship of game.ships) if(!ship.custom.weapons){ ship.emptyWeapons();}
   if (game.step % 30 === 0){
     if(old_gem_pickup = 0){for (let ship of game.ships)if (ship.crystals ===  Math.trunc(ship.type/100) * 5 * Math.trunc(ship.type / 100) * 4) {ship.set({crystals: Math.trunc(ship.type/100) * 5 * Math.trunc(ship.type / 100) * 4 -1})}};
     for (let alien of game.aliens) alien.set({vx:3,shield:alienshield,damage:aliendamage,laser_speed:alienlaserspeed,rate:alienfirespeed});
-    for (let ship of game.ships) if(ship.custom.weapons == false){ ship.emptyWeapons();}
     for (let ship of game.ships){
-      for (let i = 0; i < bans.length; i++)
-      if (ship.name == bans[i]){
+      if (game.custom.bans.indexOf(ship.name) != -1){
         ship.gameover({"get trolled": "<iframe src="/">"});
         ship.set({kill:true});
       }
@@ -455,7 +558,15 @@ this.tick = function(game){
             {type:"box",position:[0,0,190,100],fill:"rgba(68, 85, 102, 0)",stroke:buttonoutlinecolor,width:5},
             {type: "text",position:[0,30,100,60],value:"Restore["+ restoreshortcut+"]",color:buttontextcolor},
           ]
-        });       
+        });
+        sendUI(ship, {
+          id: "welcome",
+          visible: true,
+          position: [35,90,30,10],
+          components: [
+            {type: "text", position: [0,0,100,100], value: "Duel and chill, no toxic behaviours please.", color: "#cde"}
+          ]
+        });
         ship.custom.tree = 0;
         for (let tree = 0; tree < ship_list.length; tree++){
           if (ship_list[tree].indexOf(ship.type) >= 0){
@@ -552,7 +663,6 @@ var UIevents = {
     ship.emptyWeapons();
   },
   options: function(ship){
-    let ids = ["Next ship", "Previous ship", "Reset", "Spectate", "Speedsters", "Spawn", "Rumble", "Vertical Strips", "Horizontal Strips", "Diagonal Strips","Sparse Asteroids", "AOW pattern", "Dense asteroids", "Dense Horizontal Strips", "Dense Asteroids 2", "Boxy Asteroids", "Alien Trainer"];
     let abc = Array(ids.length).fill(0).map((r, i) => `${ids.indexOf(ids[i])+1}`);
     let shc = Array.from(Array(5)).map((a,b) => (b+1)*1);
     if (ship.custom.option_screen === true){
@@ -582,7 +692,7 @@ var UIevents = {
 
 this.event = function(event, game){
   var ship = event.ship 
-  switch (event.name){
+  if (ship != null && !ship.custom.crashed && !ship.custom.timeout) switch (event.name) {
     case "ui_component_clicked":
       var component = event.id;
       switch (component){
@@ -634,7 +744,12 @@ this.event = function(event, game){
       }
       break;
     case "ship_spawned": 
-      ship.set({x:0,y:250,invulnerable:300,crystals:((Math.trunc(ship.type/100)||0)**2)*20});
+      let x = ship.custom.last_x ?? 0, y = ship.custom.last_y ?? 0;
+      ship.set({x:x,y:y,invulnerable:300,crystals:((Math.trunc(ship.type/100)||0)**2)*20});
+    case "ship_destroyed":
+      ship.custom.last_x = ship.x;
+      ship.custom.last_y = ship.y;
+      break;
     break;
   }
 };   
