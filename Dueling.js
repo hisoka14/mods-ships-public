@@ -3,7 +3,7 @@ var bans = ["TEST"]; //"TEST" is placeholder for name of person you want to ban.
 var old_gem_pickup = 0;//set to true if you want old gem pickup(FOR EVERY LEVEL)
 var asteroid_respawn = false;//set to true if you want the asteroids to automatically respawn
 var rate = 45;//rate of map respawns in seconds. Lowest value reccomended is 30. Anything below 3/2 will cause extreme lag.
-var optionshortcut = "W"; //shortcutkey for the options button. 
+var optionshortcut = "B"; //shortcutkey for the options button. 
 var restoreshortcut = "J"; //shortcutkey for the restore/healing button.
 var buttontextcolor = "#cde"; //colour of the text in the button
 var buttonoutlinecolor = "#cde";//colour of the buttons outline
@@ -46,6 +46,7 @@ const alien_portal = false; //set to true to enable aliens
 let ids = ["Next ship", "Previous ship", "Reset", "Spectate", "Speedsters", "Spawn", "Rumble", "Vertical Strips", "Horizontal Strips", "Diagonal Strips","Sparse Asteroids", "AOW pattern", "Dense asteroids", "Dense Horizontal Strips", "Dense Asteroids 2", "Boxy Asteroids", "Alien Trainer"];
 
 if (!game.custom.bans) game.custom.bans = bans;
+game.ships.forEach(ship => ship.custom.init = false);
 
 var playerData = function(){
   echo("\nList of players and their data:");
@@ -541,7 +542,7 @@ this.tick = function(game){
           position: [71.5,0,6.6,4],
           clickable: true,
           visible: true,
-          shortcut: "W",
+          shortcut: optionshortcut,
           components: [
             {type:"box",position:[0,0,100,100],fill:"rgba(68, 85, 102, 0)",stroke:buttontextcolor,width:5},
             {type: "text",position:[0,30,100,60],value:"Options["+optionshortcut+"]",color:buttontextcolor},
@@ -732,14 +733,13 @@ this.event = function(event, game){
           UIevents.admin(ship);          
           break;  
         default:
-          if (scnames[0].some(a => a == component && ship.custom.weapons === true)){
-            game.addCollectible({code:parseInt(component.replace(/\D/g,'')),x:ship.x,y:ship.y})
-          } else {
-            for (let i in boxes){
+          for (let i in boxes) {
             let [x, y] = boxes[i];
-            if (component === i) ship.set({x:x,y:y});
+            if (component === i) {
+              ship.set({x:x,y:y});
+              break
+            }
           }
-        }
         break;
       }
       break;
